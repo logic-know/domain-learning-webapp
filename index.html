@@ -1,0 +1,1354 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>领域学习OS · Top-Down Domain Learning</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='1' x2='0' y2='0'%3E%3Cstop offset='0' stop-color='%234DD6C4'/%3E%3Cstop offset='1' stop-color='%238B7CF6'/%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx='32' cy='32' r='30' fill='%230A1226' stroke='url(%23g)' stroke-width='3'/%3E%3Cpath d='M12 46 L26 26 L33 36 L40 18 L52 46 Z' fill='url(%23g)'/%3E%3Ccircle cx='40' cy='18' r='3.4' fill='%23F2B455'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://miaoda.feishu.cn">
+<link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=Noto+Serif+SC:wght@500;700;900&family=Noto+Sans+SC:wght@300;400;500;600&display=swap">
+<style>
+/* ===== Design tokens ===== */
+:root{
+  --bg-0:#0A1226;
+  --bg-1:#0E1830;
+  --bg-2:#151F3D;
+  --bg-3:#1B2850;
+  --line:rgba(163,182,233,.14);
+  --line-strong:rgba(163,182,233,.26);
+  --ink-hi:#EDF3FF;
+  --ink-mid:#A9B5D3;
+  --ink-low:#67779C;
+  --teal:#4DD6C4;
+  --violet:#8B7CF6;
+  --amber:#F2B455;
+  --green:#4CC38A;
+  --yellow:#E6C15C;
+  --red:#E5606B;
+  --grad-aurora:linear-gradient(135deg,#4DD6C4 0%,#8B7CF6 100%);
+  --serif:"Noto Serif SC","Songti SC","SimSun",serif;
+  --sans:"Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;
+  --mono:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace;
+  --shadow:0 12px 40px rgba(4,8,22,.45);
+  --r-lg:18px; --r-md:12px; --r-sm:8px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:var(--sans);color:var(--ink-hi);background:var(--bg-0);
+  overflow:hidden;font-size:15px;line-height:1.65;
+  -webkit-font-smoothing:antialiased;
+}
+/* Aurora night-sky backdrop */
+.sky{
+  position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(1200px 520px at 85% -10%,rgba(139,124,246,.16),transparent 60%),
+    radial-gradient(900px 460px at 8% 8%,rgba(77,214,196,.10),transparent 55%),
+    radial-gradient(700px 700px at 50% 120%,rgba(77,214,196,.07),transparent 60%),
+    var(--bg-0);
+}
+.sky::after{
+  content:"";position:absolute;inset:0;opacity:.5;
+  background-image:radial-gradient(rgba(237,243,255,.14) 1px,transparent 1px);
+  background-size:34px 34px;
+  mask-image:radial-gradient(900px 500px at 50% 0%,#000 30%,transparent 75%);
+}
+/* ===== App frame ===== */
+.app{position:relative;z-index:1;display:flex;flex-direction:column;height:100vh}
+/* Header */
+.hdr{
+  display:flex;align-items:center;gap:18px;padding:0 22px;height:62px;flex:0 0 62px;
+  border-bottom:1px solid var(--line);background:rgba(10,18,38,.72);
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+}
+.brand{display:flex;align-items:center;gap:12px;min-width:0}
+.brand-mark{width:34px;height:34px;flex:0 0 34px}
+.brand-name{font-family:var(--serif);font-weight:900;font-size:19px;letter-spacing:.5px;white-space:nowrap}
+.brand-sub{font-size:11px;color:var(--ink-low);letter-spacing:2px;margin-top:-2px;white-space:nowrap}
+.journey{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;min-width:0;padding:0 8px}
+.jstep{display:flex;align-items:center;gap:6px;color:var(--ink-low);font-size:12px;white-space:nowrap;cursor:default}
+.jstep .jd{width:9px;height:9px;border-radius:50%;background:var(--bg-3);border:1px solid var(--line-strong);transition:all .35s}
+.jstep.on .jd{background:var(--grad-aurora);border-color:transparent;box-shadow:0 0 10px rgba(139,124,246,.55)}
+.jstep.on{color:var(--ink-hi)}
+.jstep.done .jd{background:var(--teal);border-color:transparent}
+.jstep.done{color:var(--ink-mid)}
+.jarrow{color:var(--ink-low);font-size:10px;opacity:.6}
+.hdr-ctrl{display:flex;align-items:center;gap:10px;flex:0 0 auto}
+.mode-pill{
+  display:inline-flex;align-items:center;gap:7px;padding:5px 12px;border-radius:999px;font-size:12px;
+  border:1px solid var(--line-strong);color:var(--ink-mid);background:rgba(21,31,61,.6);cursor:pointer;
+  transition:all .2s;
+}
+.mode-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--ink-low)}
+.mode-pill.api .dot{background:var(--teal);box-shadow:0 0 8px var(--teal)}
+.mode-pill.demo .dot{background:var(--amber);box-shadow:0 0 8px var(--amber)}
+.mode-pill:hover{border-color:var(--line-strong);color:var(--ink-hi)}
+.btn{
+  display:inline-flex;align-items:center;gap:7px;padding:7px 14px;border-radius:var(--r-md);
+  border:1px solid var(--line-strong);background:rgba(21,31,61,.7);color:var(--ink-hi);
+  font-family:var(--sans);font-size:13px;cursor:pointer;transition:all .2s;line-height:1.4;
+}
+.btn:hover{border-color:var(--teal);color:var(--teal);box-shadow:0 0 14px rgba(77,214,196,.15)}
+.btn.primary{background:var(--grad-aurora);border:none;color:#081020;font-weight:600}
+.btn.primary:hover{color:#081020;filter:brightness(1.08)}
+.btn svg{flex:0 0 auto}
+.btn:disabled{opacity:.45;cursor:not-allowed;pointer-events:none}
+/* Main split */
+.main{flex:1;display:flex;min-height:0}
+.side{
+  flex:0 0 304px;border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;
+  background:rgba(12,20,42,.55);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+}
+.panel{padding:18px 18px 16px;border-bottom:1px solid var(--line)}
+.panel-t{font-size:12px;letter-spacing:2px;color:var(--ink-low);display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.panel-t::before{content:"";width:14px;height:2px;background:var(--grad-aurora);border-radius:2px}
+.panel-t .pt-sub{margin-left:auto;letter-spacing:0;font-family:var(--mono);font-size:10px}
+/* Stages rail */
+.rail{display:flex;flex-direction:column;gap:2px}
+.rail-item{
+  display:flex;align-items:center;gap:12px;padding:9px 10px;border-radius:var(--r-md);cursor:pointer;
+  color:var(--ink-low);font-size:13px;transition:all .25s;position:relative;border:1px solid transparent;
+}
+.rail-item:hover{background:rgba(77,214,196,.06);color:var(--ink-mid)}
+.rail-item.on{color:var(--ink-hi);background:rgba(139,124,246,.10);border-color:rgba(139,124,246,.28)}
+.rail-item .rd{
+  width:20px;height:20px;border-radius:50%;flex:0 0 20px;display:flex;align-items:center;justify-content:center;
+  border:1.5px solid var(--line-strong);font-size:10px;font-family:var(--mono);transition:all .3s;
+}
+.rail-item.on .rd{background:var(--grad-aurora);border-color:transparent;color:#081020;font-weight:700;box-shadow:0 0 12px rgba(139,124,246,.5)}
+.rail-item.done .rd{background:var(--teal);border-color:transparent;color:#081020;font-weight:700}
+.rail-item .rname{flex:1}
+.rail-item .rbar{width:46px;height:4px;border-radius:2px;background:var(--bg-3);overflow:hidden}
+.rail-item .rbar i{display:block;height:100%;width:0;background:var(--grad-aurora);transition:width .6s ease}
+.rail-item.done .rbar i{width:100%}
+/* Zones */
+.zone{display:flex;flex-direction:column;gap:8px}
+.zone-row{display:flex;align-items:flex-start;gap:10px}
+.zlabel{display:flex;align-items:center;gap:7px;font-size:12px;flex:0 0 74px;padding-top:3px}
+.zdot{width:9px;height:9px;border-radius:50%;flex:0 0 9px}
+.zone-ok .zdot{background:var(--green);box-shadow:0 0 8px rgba(76,195,138,.5)}
+.zone-half .zdot{background:var(--yellow);box-shadow:0 0 8px rgba(230,193,92,.5)}
+.zone-none .zdot{background:var(--red);box-shadow:0 0 8px rgba(229,96,107,.5)}
+.zone-ok .zlabel{color:var(--green)}
+.zone-half .zlabel{color:var(--yellow)}
+.zone-none .zlabel{color:var(--red)}
+.ztags{display:flex;flex-wrap:wrap;gap:6px;min-height:22px}
+.ztag{
+  font-size:12px;padding:2px 10px;border-radius:999px;border:1px solid var(--line-strong);
+  color:var(--ink-mid);background:rgba(21,31,61,.5);animation:pop .3s ease;transition:all .2s;cursor:default;
+}
+.zone-ok .ztag{border-color:rgba(76,195,138,.4);color:#9FE0C2}
+.zone-half .ztag{border-color:rgba(230,193,92,.4);color:#F0DCA0}
+.zone-none .ztag{border-color:rgba(229,96,107,.4);color:#F2ACB2}
+.ztag.clickable{cursor:pointer}
+.ztag.clickable:hover{border-color:var(--teal);color:var(--teal)}
+@keyframes pop{from{transform:scale(.6);opacity:0}to{transform:scale(1);opacity:1}}
+/* Command chips */
+.cmds{display:flex;flex-wrap:wrap;gap:7px}
+.cmd{
+  font-family:var(--mono);font-size:11.5px;padding:5px 11px;border-radius:999px;cursor:pointer;
+  border:1px solid var(--line-strong);color:var(--ink-mid);background:rgba(21,31,61,.5);transition:all .2s;
+}
+.cmd:hover{color:var(--amber);border-color:var(--amber);box-shadow:0 0 10px rgba(242,180,85,.15)}
+/* Chat */
+.chat{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0}
+.chat-scroll{flex:1;overflow-y:auto;padding:26px 30px 12px;scroll-behavior:smooth}
+.chat-inner{max-width:860px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
+/* Intro / onboarding */
+.intro{max-width:860px;margin:0 auto;padding:30px 30px 8px;width:100%}
+.intro-card{
+  position:relative;border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden;
+  background:linear-gradient(180deg,rgba(21,31,61,.66),rgba(14,24,48,.5));
+  padding:30px 34px 26px;box-shadow:var(--shadow);
+}
+.intro-kicker{font-size:12px;letter-spacing:3px;color:var(--teal);display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.intro-kicker::before{content:"";width:22px;height:1.5px;background:var(--grad-aurora)}
+.intro h1{font-family:var(--serif);font-weight:900;font-size:34px;line-height:1.25;margin-bottom:12px}
+.intro h1 em{font-style:normal;background:var(--grad-aurora);-webkit-background-clip:text;background-clip:text;color:transparent}
+.intro p.desc{color:var(--ink-mid);font-size:14.5px;max-width:640px;margin-bottom:18px}
+.samples{display:flex;flex-wrap:wrap;gap:9px;margin-bottom:20px}
+.sample{
+  padding:7px 15px;border-radius:999px;border:1px solid var(--line-strong);font-size:13px;color:var(--ink-mid);
+  cursor:pointer;background:rgba(21,31,61,.6);transition:all .22s;text-align:left;
+}
+.sample:hover{color:var(--teal);border-color:var(--teal);transform:translateY(-1px)}
+.chain{margin-top:6px;border-top:1px dashed var(--line-strong);padding-top:16px}
+.chain-label{font-size:11px;letter-spacing:2px;color:var(--ink-low);margin-bottom:10px}
+.chain-flow{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.chain-node{font-size:12px;color:var(--ink-mid);padding:4px 11px;border-radius:999px;border:1px solid var(--line);background:rgba(10,18,38,.5)}
+.chain-node.hot{color:#081020;background:var(--grad-aurora);border-color:transparent;font-weight:600}
+.chain-arrow{color:var(--ink-low);font-size:11px}
+/* Mountain signature (SVG hero) */
+.mount{position:absolute;right:-30px;bottom:-34px;width:380px;height:240px;opacity:.9;pointer-events:none}
+.mount svg{width:100%;height:100%;display:block}
+/* Messages */
+.msg{display:flex;gap:14px;max-width:100%}
+.msg .ava{
+  width:36px;height:36px;flex:0 0 36px;border-radius:12px;display:flex;align-items:center;justify-content:center;
+  background:var(--grad-aurora);box-shadow:0 4px 14px rgba(139,124,246,.35);color:#081020;
+}
+.msg.user{flex-direction:row-reverse}
+.msg.user .ava{background:linear-gradient(135deg,#F2B455,#E5606B);box-shadow:0 4px 14px rgba(242,180,85,.3)}
+.msg-body{min-width:0;max-width:min(640px,calc(100% - 52px))}
+.msg.user .msg-body{text-align:right}
+.bubble{
+  border-radius:var(--r-md);padding:14px 17px;font-size:14.5px;
+  background:rgba(21,31,61,.75);border:1px solid var(--line);box-shadow:var(--shadow);
+}
+.msg.user .bubble{background:linear-gradient(135deg,rgba(242,180,85,.16),rgba(229,96,107,.10));border-color:rgba(242,180,85,.3)}
+.stage-badge{
+  display:inline-flex;align-items:center;gap:7px;font-size:11px;letter-spacing:1px;color:var(--teal);
+  font-family:var(--mono);margin-bottom:10px;padding:3px 10px;border-radius:999px;
+  border:1px solid rgba(77,214,196,.35);background:rgba(77,214,196,.08);
+}
+.bubble .md{word-break:break-word}
+.bubble .md h3{font-family:var(--serif);font-size:15.5px;font-weight:700;margin:14px 0 6px;color:var(--ink-hi)}
+.bubble .md h3:first-child{margin-top:0}
+.bubble .md h4{font-size:14px;font-weight:600;margin:11px 0 5px;color:var(--teal)}
+.bubble .md p{margin:7px 0}
+.bubble .md ul,.bubble .md ol{margin:7px 0 7px 20px}
+.bubble .md li{margin:4px 0}
+.bubble .md strong{color:var(--amber);font-weight:600}
+.bubble .md code{font-family:var(--mono);font-size:12.5px;background:rgba(10,18,38,.8);padding:1.5px 6px;border-radius:5px;color:#9FE0E2}
+.bubble .md pre{background:rgba(10,18,38,.85);border:1px solid var(--line);border-radius:var(--r-sm);padding:11px 13px;overflow-x:auto;margin:8px 0;font-family:var(--mono);font-size:12.5px;line-height:1.6;color:#C6D3F2}
+.bubble .md blockquote{border-left:3px solid var(--violet);padding:3px 12px;margin:8px 0;color:var(--ink-mid);font-size:13.5px}
+.bubble .md hr{border:none;border-top:1px dashed var(--line-strong);margin:12px 0}
+.bubble .md .treebox{background:rgba(10,18,38,.6);border:1px solid var(--line);border-radius:var(--r-sm);padding:10px 12px;font-family:var(--mono);font-size:12.5px;line-height:1.7;color:#C6D3F2;overflow-x:auto;white-space:pre}
+.qtag{
+  display:inline-block;margin-top:10px;font-size:12.5px;color:var(--amber);
+  border:1px dashed rgba(242,180,85,.45);padding:5px 12px;border-radius:var(--r-sm);background:rgba(242,180,85,.06);
+}
+.qtag::before{content:"检测 · "}
+.typing{display:flex;align-items:center;gap:5px;padding:8px 4px}
+.typing i{width:7px;height:7px;border-radius:50%;background:var(--ink-mid);animation:blink 1.2s infinite}
+.typing i:nth-child(2){animation-delay:.18s}
+.typing i:nth-child(3){animation-delay:.36s}
+@keyframes blink{0%,70%,100%{opacity:.25;transform:translateY(0)}35%{opacity:1;transform:translateY(-3px)}}
+/* Input bar */
+.input-wrap{border-top:1px solid var(--line);background:rgba(10,18,38,.72);backdrop-filter:blur(14px);padding:10px 30px 14px}
+.input-inner{max-width:860px;margin:0 auto}
+.input-chips{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:9px}
+.input-row{display:flex;gap:10px;align-items:flex-end}
+textarea{
+  flex:1;resize:none;min-height:52px;max-height:160px;padding:14px 16px;border-radius:var(--r-md);
+  background:var(--bg-2);border:1px solid var(--line-strong);color:var(--ink-hi);font-family:var(--sans);
+  font-size:14.5px;line-height:1.6;outline:none;transition:border-color .2s;
+}
+textarea:focus{border-color:var(--teal);box-shadow:0 0 0 3px rgba(77,214,196,.14)}
+textarea::placeholder{color:var(--ink-low)}
+.send-btn{width:52px;height:52px;border-radius:var(--r-md);border:none;background:var(--grad-aurora);color:#081020;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;flex:0 0 52px}
+.send-btn:hover{filter:brightness(1.1);box-shadow:0 0 18px rgba(77,214,196,.4)}
+.send-btn:disabled{opacity:.4;cursor:not-allowed;box-shadow:none;pointer-events:none}
+.input-hint{font-size:11.5px;color:var(--ink-low);margin-top:7px;display:flex;gap:8px;flex-wrap:wrap}
+.input-hint b{color:var(--ink-mid);font-weight:500}
+/* Side toggle (mobile) */
+.side-toggle{display:none}
+/* Tree drawer */
+.drawer{
+  position:fixed;top:62px;right:0;bottom:0;width:min(440px,92vw);z-index:40;
+  background:rgba(10,18,38,.97);border-left:1px solid var(--line-strong);
+  transform:translateX(102%);transition:transform .35s cubic-bezier(.22,.9,.3,1);
+  display:flex;flex-direction:column;box-shadow:-18px 0 50px rgba(4,8,22,.5);
+}
+.drawer.open{transform:translateX(0)}
+.drawer-h{display:flex;align-items:center;gap:10px;padding:18px 20px;border-bottom:1px solid var(--line)}
+.drawer-h .d-title{font-family:var(--serif);font-weight:700;font-size:16px}
+.drawer-h .close{margin-left:auto}
+.drawer-body{flex:1;overflow-y:auto;padding:18px 20px}
+.tree-node{font-size:13px;color:var(--ink-mid);padding:7px 12px;border-radius:var(--r-sm);cursor:pointer;display:flex;align-items:center;gap:9px;transition:all .2s;border:1px solid transparent}
+.tree-node:hover{background:rgba(77,214,196,.07);color:var(--ink-hi)}
+.tree-node .tn-dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px;background:var(--line-strong)}
+.tree-node.l1 .tn-dot{background:var(--violet);box-shadow:0 0 7px rgba(139,124,246,.5)}
+.tree-node.l2 .tn-dot{background:var(--teal);box-shadow:0 0 7px rgba(77,214,196,.5)}
+.tree-node.root .tn-dot{background:var(--amber);box-shadow:0 0 9px rgba(242,180,85,.6)}
+.tree-branch{margin-left:26px;border-left:1px dashed var(--line-strong);padding-left:14px;display:flex;flex-direction:column;gap:5px;margin-top:5px}
+/* Modals */
+.overlay{position:fixed;inset:0;z-index:50;background:rgba(4,8,22,.66);backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center;padding:20px}
+.overlay.open{display:flex}
+.modal{width:min(640px,96vw);max-height:86vh;overflow-y:auto;background:var(--bg-1);border:1px solid var(--line-strong);border-radius:var(--r-lg);box-shadow:var(--shadow);padding:26px 28px}
+.modal-h{display:flex;align-items:center;gap:12px;margin-bottom:20px}
+.modal-h .m-title{font-family:var(--serif);font-weight:700;font-size:19px}
+.modal-h .close{margin-left:auto}
+.field{margin-bottom:16px}
+.field label{display:block;font-size:12px;letter-spacing:1.5px;color:var(--ink-low);margin-bottom:7px}
+.field input,.field select{
+  width:100%;padding:11px 13px;border-radius:var(--r-md);background:var(--bg-2);border:1px solid var(--line-strong);
+  color:var(--ink-hi);font-family:var(--sans);font-size:14px;outline:none;transition:border-color .2s;
+}
+.field input:focus,.field select:focus{border-color:var(--teal)}
+.field .hint{font-size:11.5px;color:var(--ink-low);margin-top:5px;line-height:1.5}
+.seg{display:flex;gap:8px}
+.seg .btn{flex:1;justify-content:center}
+.card-md{background:rgba(10,18,38,.7);border:1px solid var(--line);border-radius:var(--r-md);padding:18px 20px;max-height:44vh;overflow-y:auto;font-size:13.5px;margin-bottom:16px}
+.card-md h1{font-family:var(--serif);font-size:18px;font-weight:700;margin-bottom:10px}
+.card-md h2{font-family:var(--serif);font-size:14.5px;font-weight:700;margin:12px 0 5px;color:var(--teal)}
+.card-md p,.card-md ul{margin:5px 0}
+.card-md code{font-family:var(--mono);font-size:12px;background:rgba(10,18,38,.9);padding:1px 5px;border-radius:4px;color:#9FE0E2}
+.card-md pre{background:#0A1226;border:1px solid var(--line);border-radius:6px;padding:10px;overflow-x:auto;font-family:var(--mono);font-size:12px}
+.card-actions{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
+/* Toast */
+.toast{
+  position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);z-index:80;
+  background:var(--bg-3);border:1px solid var(--line-strong);color:var(--ink-hi);font-size:13px;
+  padding:10px 20px;border-radius:999px;opacity:0;pointer-events:none;transition:all .3s;box-shadow:var(--shadow);
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+/* Scrollbars */
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-thumb{background:rgba(103,119,156,.35);border-radius:9px;border:2px solid transparent;background-clip:content-box}
+::-webkit-scrollbar-track{background:transparent}
+::selection{background:rgba(77,214,196,.28)}
+/* Focus & motion */
+:focus-visible{outline:2px solid var(--teal);outline-offset:2px;border-radius:4px}
+@media (prefers-reduced-motion:reduce){
+  *{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+}
+/* Responsive */
+@media (max-width:1024px){
+  .jstep .jname{display:none}
+  .jarrow{display:none}
+}
+@media (max-width:820px){
+  .hdr{padding:0 12px;gap:10px;height:58px;flex-basis:58px}
+  .brand-name{font-size:15px}
+  .brand-sub{display:none}
+  .journey{display:none}
+  .hdr-ctrl{gap:6px}
+  .hdr-ctrl .btn{padding:7px 9px;font-size:12px}
+  .btn .btn-label{display:none}
+  .side{position:fixed;left:0;top:58px;bottom:0;width:min(340px,88vw);z-index:30;transform:translateX(-102%);transition:transform .32s cubic-bezier(.22,.9,.3,1);border-right:1px solid var(--line-strong);box-shadow:18px 0 50px rgba(4,8,22,.5)}
+  .side.open{transform:translateX(0)}
+  .side-toggle{display:inline-flex}
+  .drawer{top:58px}
+  .chat-scroll{padding:20px 16px 10px}
+  .intro{padding:16px 12px 6px}
+  .intro-card{padding:24px 20px}
+  .intro h1{font-size:26px}
+  .mount{width:250px;height:160px;opacity:.55}
+  .input-wrap{padding:10px 14px 12px}
+  .msg .ava{width:32px;height:32px;flex-basis:32px;border-radius:10px}
+}
+</style>
+</head>
+<body>
+<div class="sky"></div>
+<div class="app">
+<!-- ===== 头部 ===== -->
+<header class="hdr">
+  <div class="brand">
+    <svg class="brand-mark" viewBox="0 0 64 64" aria-hidden="true">
+      <defs>
+        <linearGradient id="lgMark" x1="0" y1="1" x2="0" y2="0">
+          <stop offset="0" stop-color="#4DD6C4"/><stop offset="1" stop-color="#8B7CF6"/>
+        </linearGradient>
+      </defs>
+      <circle cx="32" cy="32" r="29" fill="none" stroke="url(#lgMark)" stroke-width="3"/>
+      <path d="M12 45 L26 25 L33 35 L40 17 L52 45 Z" fill="url(#lgMark)"/>
+      <circle cx="40" cy="17" r="3.2" fill="#F2B455"/>
+    </svg>
+    <div>
+      <div class="brand-name">领域学习OS</div>
+      <div class="brand-sub">TOP-DOWN DOMAIN LEARNING</div>
+    </div>
+  </div>
+  <nav class="journey" id="journey" aria-label="学习旅程">
+    <span class="jstep on" data-s="1"><span class="jd"></span><span class="jname">领域全景</span></span><span class="jarrow">›</span>
+    <span class="jstep" data-s="2"><span class="jd"></span><span class="jname">知识树</span></span><span class="jarrow">›</span>
+    <span class="jstep" data-s="3"><span class="jd"></span><span class="jname">逐层讲解</span></span><span class="jarrow">›</span>
+    <span class="jstep" data-s="4"><span class="jd"></span><span class="jname">理解检测</span></span><span class="jarrow">›</span>
+    <span class="jstep" data-s="5"><span class="jd"></span><span class="jname">解法拆解</span></span><span class="jarrow">›</span>
+    <span class="jstep" data-s="6"><span class="jd"></span><span class="jname">知识卡片</span></span>
+  </nav>
+  <div class="hdr-ctrl">
+    <button class="mode-pill demo" id="modePill" title="切换运行模式">
+      <span class="dot"></span><span id="modePillText">演示模式</span>
+    </button>
+    <button class="btn side-toggle" id="sideToggle" aria-label="打开侧栏">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+      <span class="btn-label">学习面板</span>
+    </button>
+    <button class="btn" id="treeBtn" aria-label="知识树">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="2.6"/><circle cx="5" cy="18" r="2.4"/><circle cx="19" cy="18" r="2.4"/><path d="M12 7.6V11M5 16v-2a5 5 0 0 1 5-5h4"/></svg>
+      <span class="btn-label">知识树</span>
+    </button>
+    <button class="btn" id="settingsBtn" aria-label="设置">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1.03-1.56 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.56-1.03 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h.01a1.7 1.7 0 0 0 1.03-1.56V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.01a1.7 1.7 0 0 0 1.56 1.03H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.56 1.03z"/></svg>
+      <span class="btn-label">设置</span>
+    </button>
+  </div>
+</header>
+
+<!-- ===== 主体 ===== -->
+<div class="main">
+  <!-- 侧栏 -->
+  <aside class="side" id="side">
+    <section class="panel">
+      <div class="panel-t">学习旅程<span class="pt-sub" id="stageCount">0 / 6</span></div>
+      <div class="rail" id="rail">
+        <div class="rail-item on" data-s="1"><span class="rd">1</span><span class="rname">领域全景</span><span class="rbar"><i></i></span></div>
+        <div class="rail-item" data-s="2"><span class="rd">2</span><span class="rname">知识层级树</span><span class="rbar"><i></i></span></div>
+        <div class="rail-item" data-s="3"><span class="rd">3</span><span class="rname">自上而下讲解</span><span class="rbar"><i></i></span></div>
+        <div class="rail-item" data-s="4"><span class="rd">4</span><span class="rname">理解检测</span><span class="rbar"><i></i></span></div>
+        <div class="rail-item" data-s="5"><span class="rd">5</span><span class="rname">解法拆解</span><span class="rbar"><i></i></span></div>
+        <div class="rail-item" data-s="6"><span class="rd">6</span><span class="rname">知识卡片</span><span class="rbar"><i></i></span></div>
+      </div>
+    </section>
+    <section class="panel">
+      <div class="panel-t">理解状态区</div>
+      <div class="zone">
+        <div class="zone-row zone-ok">
+          <div class="zlabel"><span class="zdot"></span>已理解</div>
+          <div class="ztags" id="zoneOk"><span class="ztag empty-hint" style="color:var(--ink-low)">暂无</span></div>
+        </div>
+        <div class="zone-row zone-half">
+          <div class="zlabel"><span class="zdot"></span>基本理解</div>
+          <div class="ztags" id="zoneHalf"><span class="ztag empty-hint" style="color:var(--ink-low)">暂无</span></div>
+        </div>
+        <div class="zone-row zone-none">
+          <div class="zlabel"><span class="zdot"></span>尚未理解</div>
+          <div class="ztags" id="zoneNone"><span class="ztag empty-hint" style="color:var(--ink-low)">暂无</span></div>
+        </div>
+      </div>
+    </section>
+    <section class="panel">
+      <div class="panel-t">学习控制指令</div>
+      <div class="cmds" id="cmds">
+        <button class="cmd" data-cmd="@全景">@全景</button>
+        <button class="cmd" data-cmd="@下钻">@下钻</button>
+        <button class="cmd" data-cmd="@退回">@退回</button>
+        <button class="cmd" data-cmd="@测试">@测试</button>
+        <button class="cmd" data-cmd="@应用">@应用</button>
+        <button class="cmd" data-cmd="@回到问题">@回到问题</button>
+        <button class="cmd" data-cmd="@现状">@现状</button>
+        <button class="cmd" data-cmd="@知识卡片">@知识卡片</button>
+      </div>
+    </section>
+    <section class="panel" style="border-bottom:none">
+      <div class="panel-t">当前难题</div>
+      <div id="curProblem" style="font-size:13px;color:var(--ink-mid);line-height:1.6">尚未开始学习。选择一个领域难题，或直接在下方输入。</div>
+    </section>
+  </aside>
+
+  <!-- 对话区 -->
+  <main class="chat">
+    <div class="intro" id="intro">
+      <div class="intro-card">
+        <svg class="mount" viewBox="0 0 380 240" aria-hidden="true">
+          <defs>
+            <linearGradient id="skyG" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#8B7CF6" stop-opacity=".55"/>
+              <stop offset="1" stop-color="#4DD6C4" stop-opacity="0"/>
+            </linearGradient>
+            <linearGradient id="mtG" x1="0" y1="1" x2="0" y2="0">
+              <stop offset="0" stop-color="#0E1830"/><stop offset="1" stop-color="#25355F"/>
+            </linearGradient>
+          </defs>
+          <path d="M0 240 L70 150 L120 190 L190 86 L260 170 L310 128 L380 240 Z" fill="url(#mtG)" opacity=".9"/>
+          <path d="M0 240 L60 175 L105 205 L165 130 L235 200 L300 165 L380 240 Z" fill="#0A1226" opacity=".8"/>
+          <path d="M40 0 C120 34 130 74 210 44 C290 14 320 40 380 22" fill="none" stroke="url(#skyG)" stroke-width="5" stroke-linecap="round" opacity=".8"/>
+          <path d="M0 60 C90 94 160 50 250 84 C310 104 350 86 380 96" fill="none" stroke="url(#skyG)" stroke-width="3" stroke-linecap="round" opacity=".5"/>
+          <circle cx="190" cy="86" r="5" fill="#F2B455"/>
+          <circle cx="190" cy="86" r="10" fill="#F2B455" opacity=".25"/>
+        </svg>
+        <div class="intro-kicker">苏格拉底式 · 问题驱动 · 自上而下</div>
+        <h1>把陌生领域难题，<em>从山顶看清</em></h1>
+        <p class="desc">输入一个领域难题，学习系统会反向构建理解它所需的最小知识体系：先看领域全景，再沿知识树逐层下钻，每层都检测你是否真正理解，最后回到难题本身拆解现有解法。你可以随时用 @指令 控制学习节奏。</p>
+        <div class="samples" id="samples">
+          <button class="sample" data-q="大模型为什么会产生幻觉？">大模型幻觉</button>
+          <button class="sample" data-q="为什么镜头拍出的照片边缘会模糊变形？">光学像差</button>
+          <button class="sample" data-q="Transformer 为什么需要位置编码？">位置编码</button>
+          <button class="sample" data-q="湍流为什么是物理学最难的未解问题之一？">湍流</button>
+        </div>
+        <div class="chain">
+          <div class="chain-label">学习路径</div>
+          <div class="chain-flow" id="introChain">
+            <span class="chain-node hot">领域难题</span><span class="chain-arrow">→</span>
+            <span class="chain-node">为什么难</span><span class="chain-arrow">→</span>
+            <span class="chain-node">需要哪些知识</span><span class="chain-arrow">→</span>
+            <span class="chain-node">过去怎么解决</span><span class="chain-arrow">→</span>
+            <span class="chain-node">现在怎么解决</span><span class="chain-arrow">→</span>
+            <span class="chain-node">还有什么没解决</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="chat-scroll" id="chatScroll">
+      <div class="chat-inner" id="chatInner"></div>
+    </div>
+    <div class="input-wrap">
+      <div class="input-inner">
+        <div class="input-chips" id="inputChips">
+          <button class="cmd" data-cmd="@全景">@全景</button>
+          <button class="cmd" data-cmd="@下钻">@下钻</button>
+          <button class="cmd" data-cmd="@退回">@退回</button>
+          <button class="cmd" data-cmd="@测试">@测试</button>
+          <button class="cmd" data-cmd="@应用">@应用</button>
+          <button class="cmd" data-cmd="@回到问题">@回到问题</button>
+          <button class="cmd" data-cmd="@现状">@现状</button>
+          <button class="cmd" data-cmd="@知识卡片">@知识卡片</button>
+        </div>
+        <div class="input-row">
+          <textarea id="input" placeholder="输入你的领域难题、或一句回答…（Enter 发送，Shift+Enter 换行）" rows="2"></textarea>
+          <button class="send-btn" id="sendBtn" aria-label="发送">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+          </button>
+        </div>
+        <div class="input-hint" id="inputHint">
+          <span>演示模式：内置示例讲师，无需 API 即可体验</span>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ===== 知识树抽屉 ===== -->
+<div class="drawer" id="treeDrawer">
+  <div class="drawer-h">
+    <div class="d-title">理解此难题所需的最小知识树</div>
+    <button class="btn close" id="treeClose" aria-label="关闭">关闭</button>
+  </div>
+  <div class="drawer-body" id="treeBody">
+    <p style="font-size:13px;color:var(--ink-low);line-height:1.7">开始学习后，这里会显示围绕原问题建立的知识层级树。点击概念节点可以直接下钻讲解。</p>
+  </div>
+</div>
+
+<!-- ===== 设置弹层 ===== -->
+<div class="overlay" id="settingsOverlay">
+  <div class="modal">
+    <div class="modal-h">
+      <div class="m-title">运行设置</div>
+      <button class="btn close" id="settingsClose" aria-label="关闭">关闭</button>
+    </div>
+    <div class="seg" style="margin-bottom:18px">
+      <button class="btn primary" id="modeDemoBtn">演示模式</button>
+      <button class="btn" id="modeApiBtn">接入 API</button>
+    </div>
+    <div id="apiFields">
+      <div class="field">
+        <label>接口地址（OpenAI 兼容）</label>
+        <input id="apiBase" placeholder="https://api.deepseek.com/v1" spellcheck="false">
+      </div>
+      <div class="field">
+        <label>API Key</label>
+        <input id="apiKey" type="password" placeholder="sk-…" spellcheck="false">
+      </div>
+      <div class="field">
+        <label>模型名称</label>
+        <input id="apiModel" placeholder="deepseek-chat" spellcheck="false">
+      </div>
+      <div class="field">
+        <div class="hint">支持任意 OpenAI 兼容接口（DeepSeek、OpenAI、Moonshot、智谱等）。Key 仅保存在你本机浏览器中，不会上传任何服务器。</div>
+      </div>
+    </div>
+    <div class="card-actions">
+      <button class="btn primary" id="saveSettings">保存设置</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 知识卡片弹层 ===== -->
+<div class="overlay" id="cardOverlay">
+  <div class="modal">
+    <div class="modal-h">
+      <div class="m-title">领域知识卡片</div>
+      <button class="btn close" id="cardClose" aria-label="关闭">关闭</button>
+    </div>
+    <div class="card-md" id="cardMd"></div>
+    <div class="card-actions">
+      <button class="btn" id="cardCopy">复制 Markdown</button>
+      <button class="btn" id="cardDownload">下载 .md</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+</div>
+<script>
+"use strict";
+/* ========== 工具 ========== */
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const STAGE_NAMES = ['','领域全景','知识层级树','自上而下讲解','理解检测','解法拆解','知识卡片'];
+let toastTimer = null;
+function toast(msg){
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(()=>t.classList.remove('show'), 2400);
+}
+/* 轻量 Markdown → HTML（支持标题/粗体/行内代码/代码块/列表/引用/[[链接]]） */
+function mdToHtml(src){
+  let s = esc(src);
+  s = s.replace(/```([\s\S]*?)```/g, (m,c)=>'<pre>'+c+'</pre>');
+  s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
+  s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  s = s.replace(/\[\[([^\]]+)\]\]/g, '<span style="color:var(--violet)">[[$1]]</span>');
+  const lines = s.split('\n');
+  let html = '', inList = null, inPre = false;
+  const closeList = () => { if(inList){ html += '</' + inList + '>'; inList = null; } };
+  for(const raw of lines){
+    if(inPre){
+      html += raw + '\n';
+      if(raw.indexOf('</pre>') >= 0) inPre = false;
+      continue;
+    }
+    if(raw.indexOf('<pre>') >= 0){ inPre = true; html += raw + '\n'; continue; }
+    let l = raw.trim();
+    if(!l){ closeList(); continue; }
+    if(/^###\s/.test(l)){ closeList(); html += '<h3>' + l.slice(4) + '</h3>'; continue; }
+    if(/^##\s/.test(l)){ closeList(); html += '<h3>' + l.slice(3) + '</h3>'; continue; }
+    if(/^#\s/.test(l)){ closeList(); html += '<h3>' + l.slice(2) + '</h3>'; continue; }
+    if(/^[-•]\s/.test(l)){ if(inList !== 'ul'){ closeList(); html += '<ul>'; inList = 'ul'; } html += '<li>' + l.replace(/^[-•]\s/,'') + '</li>'; continue; }
+    if(/^\d+\.\s/.test(l)){ if(inList !== 'ol'){ closeList(); html += '<ol>'; inList = 'ol'; } html += '<li>' + l.replace(/^\d+\.\s/,'') + '</li>'; continue; }
+    if(/^>\s?/.test(l)){ closeList(); html += '<blockquote>' + l.replace(/^>\s?/,'') + '</blockquote>'; continue; }
+    if(/^---+$/.test(l)){ closeList(); html += '<hr>'; continue; }
+    closeList(); html += '<p>' + l + '</p>';
+  }
+  closeList();
+  return html;
+}
+/* ========== 全局状态 ========== */
+const S = {
+  mode: 'demo',
+  api: { base: 'https://api.deepseek.com/v1', key: '', model: 'deepseek-chat' },
+  problem: '',          // 当前难题
+  stage: 0,             // 当前阶段 1..6
+  doneStages: [],
+  zones: { ok: [], half: [], none: [] },
+  tree: [],             // {label, level, id}
+  levels: 0,
+  sampleKey: '',
+  history: [],          // {role, text, stage}
+  card: '',
+  busy: false,
+  currentLv: 0,         // 讲解深度指针
+  pendingQ: '',         // 待检测问题
+};
+/* ========== 示例知识库（演示模式） ========== */
+const DEMO = {
+  'llm-hallucination': {
+    problem: '大模型为什么会产生幻觉？',
+    domain: '人工智能 → 大模型 → 生成式 AI → 幻觉问题',
+    viewQ: '它实际上是在问：一个只会"预测下一个词"的模型，为什么能一本正经地讲出从未发生过的事？',
+    panorama: [
+      ['属于哪个领域','人工智能 → 大模型（LLM）→ 生成式 AI → 幻觉问题。'],
+      ['领域在研究什么','让机器学会按人类语言生成文本，并尽量保证生成内容与事实一致。不假设你懂任何背景——你只需要知道：这类模型"读"过海量文本，然后模仿文本的统计规律来续写。'],
+      ['你的问题在问什么','模型像一位记忆力极好、但分不清记忆与编造的讲述者。你在问：为什么它会把没有的事实讲得煞有其事、语气还特别笃定？'],
+      ['为什么重要','医疗、法律、金融、教育等高影响场景中，幻觉会直接导致错误决策与信任崩塌；它被普遍认为是生成式 AI 落地的头号障碍。'],
+      ['大致解决路线','问题 → 原因A（训练目标奖励"像话"不奖励"真实"）→ 原因B（知识被压缩进有限参数）→ 传统方法（调低采样温度、提示"不知道就说不知道"）→ 现代方法（检索增强 RAG、工具验证、偏好对齐）→ 当前瓶颈（模型难以自证、缺少外部世界模型）。'],
+    ],
+    tree: [
+      { label: '大模型幻觉', level: 0 },
+      { label: '语言建模', level: 1 },
+      { label: '下一个词预测', level: 2 },
+      { label: '困惑度（像不像语料）', level: 2 },
+      { label: '知识表征', level: 1 },
+      { label: '参数化记忆（知识压缩）', level: 2 },
+      { label: '长尾事实存储不足', level: 2 },
+      { label: '解码采样', level: 1 },
+      { label: '温度与 top-p', level: 2 },
+      { label: '流畅性 vs 真实性', level: 2 },
+    ],
+    levels: [
+      ['Level 0 · 生活语言','想象一个天赋极高但偶尔胡编的学生：他靠大量阅读学会了"像模像样地说话"。你问他不知道的事，他会用流利、自信、听起来完全合理的话来填空——这就是幻觉。'],
+      ['Level 1 · 百科级解释','定义：大语言模型（LLM）以"预测下一个词"为训练任务，从海量文本中学习语言统计规律；幻觉指它生成的文本与事实不符，却语气笃定。研究对象是"语言统计规律"与"事实真相"之间的落差。'],
+      ['Level 2 · 核心机制','训练时，模型把见过的一切"压缩"进有限的参数里——高频事实存得牢，低频（长尾）事实存得差；生成时从概率分布中采样，低概率的"编造路径"也可能被选中；更根本的是，训练目标只奖励"像人话"，从不奖励"是事实"。'],
+      ['Level 3 · 学术解释','自回归语言建模最大化 P(w₁…w_n) 的似然；知识以参数形式隐式存储（研究证实可从参数中检索出事实）；解码用 temperature / top-p 引入随机性；困惑度只能衡量"像不像训练语料"，无法衡量真假。评估常用事实核对（如 FactScore）与引用召回率。'],
+    ],
+    apply: '真实案例：向一个只用旧语料训练的模型询问 2024 年新发布的产品参数，它可能"编"出一个合理但根本不存在的规格。法律咨询机器人用检索增强（RAG）把相关条文注入上下文后，幻觉大幅下降，但仍可能曲解条文含义——这就是"缓解"与"解决"的区别。',
+    detectQ: '因果题：如果训练数据里关于某件事实的文本出现次数非常少，模型生成该事实时为什么更容易出错？',
+    solutions: {
+      past: '过去怎么解决：调低 temperature 让输出更保守、用 few-shot 提示"不知道就说不知道"、人工后校对。为什么有效：降低随机性、约束行为。缺点：治标不治本，模型依然"不知道"自己不知道。',
+      now: '现在怎么解决：检索增强生成（RAG）把外部资料注入上下文、要求生成时附引用来源、用 RLHF / 偏好对齐惩罚错误、推理时调用工具（搜索、计算器、代码执行）验证、置信度校准与拒答。为什么更好：给模型"翻书"的能力，而不是只靠记忆。',
+      degree: '解决到什么程度：简单事实问答的幻觉已大幅缓解；多跳推理、开放域长文本、需要实时知识的问题仍大量存在；"模型不知道自己在编"这个根本问题尚未解决。',
+      bottleneck: '为什么还没完全解决：模型没有可靠的外部世界模型；流畅性与真实性在训练目标上互相冲突；用模型验证模型存在循环论证。',
+    },
+    cardExtra: {
+      whyHard: '因为"像人话"和"是事实"是两回事：模型只被训练得像人话，事实只是它的副产品。',
+      myUnd: '我的理解：幻觉不是"坏了"，而是"目标函数里没有真相"的直接后果。',
+      related: '[[检索增强生成]]\n[[自回归语言模型]]\n[[RLHF]]\n[[困惑度]]',
+    },
+  },
+  'aberration': {
+    problem: '为什么镜头拍出的照片边缘会模糊变形？',
+    domain: '光学 → 光学设计 → 成像 → 像差',
+    viewQ: '它实际上是在问：理论上透镜能把一个点聚焦成一个点，为什么现实中的镜头却会把点变成模糊的斑、彩色的边、扭曲的形？',
+    panorama: [
+      ['属于哪个领域','光学 → 光学设计 → 成像 → 像差。'],
+      ['领域在研究什么','研究光线如何被透镜、镜组转折并汇聚成清晰图像。像差（aberration）是"理想成像"与"实际成像"之间的系统性偏差。'],
+      ['你的问题在问什么','镜头号称"聚焦"，但每根光线走的实际路径并不完全重合：本该是一个点的像，变成了模糊斑、色边或扭曲——你在问为什么理论上该聚焦、实际却偏了。'],
+      ['为什么重要','相机、显微镜、望远镜、光刻机全靠镜头成像；像差直接决定分辨率上限。光刻机每推进一纳米，本质上都是像差校正的胜利。'],
+      ['大致解决路线','问题 → 原因A（球面镜片对不同位置的光焦距不同）→ 原因B（不同颜色光的折射率不同）→ 传统方法（缩小光圈、多片组合）→ 改进方法（非球面、消色差胶合）→ 现代方法（计算机全局优化、衍射极限设计）→ 当前瓶颈（材料、成本、多像差互相牵制）。'],
+    ],
+    tree: [
+      { label: '像差', level: 0 },
+      { label: '几何像差', level: 1 },
+      { label: '球差', level: 2 },
+      { label: '彗差 / 像散 / 场曲', level: 2 },
+      { label: '畸变', level: 2 },
+      { label: '色差', level: 1 },
+      { label: '轴向色差', level: 2 },
+      { label: '倍率色差', level: 2 },
+      { label: '衍射极限', level: 1 },
+      { label: '艾里斑', level: 2 },
+    ],
+    levels: [
+      ['Level 0 · 生活语言','用放大镜看字，边缘会发虚、发彩、变形——不是镜片脏了，而是"用曲面弯折光线"这件事本身的物理规律决定了它无法完美聚焦。'],
+      ['Level 1 · 百科级解释','定义：理想光学系统把物点成像为像点；像差是实际系统对理想成像的系统性偏离。研究对象：光线经过球面折射后，如何偏离理想的单一汇聚点。'],
+      ['Level 2 · 核心机制','球面镜片对不同入射高度的光线焦距不同（球差）；不同波长的光折射率不同，焦点前后错开（色差）；离轴光线不再汇聚到同一点（彗差、像散、场曲）；放大率随视场变化（畸变）。根源是：用简单的球面去逼近理想的成像面。'],
+      ['Level 3 · 学术解释','近轴（一阶）光学给出理想成像；三级像差理论用赛德尔五项（球差、彗差、像散、场曲、畸变）定量描述偏差；用点列图、波像差评价成像质量；衍射极限由艾里斑半径 r ≈ 1.22λ·f/D 决定——光圈再小也有衍射兜底。'],
+    ],
+    apply: '真实案例：手机镜头用非球面塑料镜片 + 计算摄影算法校正畸变；光刻机用数十片精密镜组把像差压到纳米级；天文望远镜用自适应光学实时抵消大气湍流造成的波前畸变。',
+    detectQ: '反例题：把镜头光圈收到很小，球差确实变小了——为什么照片却不会因此无限清晰？',
+    solutions: {
+      past: '过去怎么解决：缩小光圈减少边缘光线、单透镜手工研磨、简单胶合。为什么有效：减少参与成像的"坏光线"。缺点：进光量下降、视场受限、色差仍明显。',
+      now: '现在怎么解决：多镜片光学设计 + 计算机全局优化、非球面与自由曲面、消色差/复消色差镜组、衍射光学元件、计算成像后处理。为什么更好：把"硬件校正"和"软件校正"结合，逼近衍射极限。',
+      degree: '解决到什么程度：消费级可见光成像已接近衍射极限；紫外/极紫外、超大视场、连续变焦系统仍是硬仗。',
+      bottleneck: '为什么还没完全解决：材料色散能力有限、制造公差昂贵、重量与成本约束，以及多种像差此消彼长的帕累托权衡。',
+    },
+    cardExtra: {
+      whyHard: '因为理想成像要求"所有光线、所有颜色都汇聚到一点"，而球面折射的物理性质天然做不到；修正一种偏差往往引入另一种。',
+      myUnd: '我的理解：像差是"用简单曲面逼近完美曲面"的代价，好镜头就是一场多目标的妥协艺术。',
+      related: '[[赛德尔像差]]\n[[衍射极限]]\n[[非球面]]\n[[消色差]]',
+    },
+  },
+  'pos-encoding': {
+    problem: 'Transformer 为什么需要位置编码？',
+    domain: '深度学习 → Transformer → 序列建模 → 位置编码',
+    viewQ: '它实际上是在问：一个"同时看所有词"的模型，怎么知道谁先谁后、谁挨着谁？给词贴位置标签这件事，为什么这么讲究？',
+    panorama: [
+      ['属于哪个领域','深度学习 → Transformer → 序列建模 → 位置编码。'],
+      ['领域在研究什么','让神经网络处理有顺序的信息（文字、时间、坐标），并让模型理解"顺序"本身。'],
+      ['你的问题在问什么','Transformer 一次性看到全部词，本身不携带任何顺序信息——就像把句子倒进一个袋子。你在问：为什么必须给每个词补一个"第几位"的标签，以及怎么补才不破坏词义。'],
+      ['为什么重要','没有顺序信息，模型分不清"猫追狗"和"狗追猫"。位置编码是 ChatGPT、Llama 等所有现代大模型的骨架零件。'],
+      ['大致解决路线','问题 → 原因（自注意力是置换不变的）→ 传统方法（RNN/CNN 天然按顺序处理）→ 改进方法（正弦位置编码）→ 现代方法（可学习编码、RoPE 旋转位置编码）→ 当前瓶颈（长度外推）。'],
+    ],
+    tree: [
+      { label: '位置编码', level: 0 },
+      { label: '序列建模', level: 1 },
+      { label: '自注意力机制', level: 2 },
+      { label: '置换不变性', level: 2 },
+      { label: '词嵌入', level: 1 },
+      { label: '绝对位置编码', level: 2 },
+      { label: '正弦编码', level: 2 },
+      { label: '可学习编码', level: 2 },
+      { label: '相对位置', level: 1 },
+      { label: 'RoPE 旋转位置', level: 2 },
+    ],
+    levels: [
+      ['Level 0 · 生活语言','一队人报数时，必须先给他们发号码牌。Transformer 就像这队人：它自己不知道谁排第几、谁挨着谁，位置编码就是那张号码牌。'],
+      ['Level 1 · 百科级解释','定义：位置编码把"位置序号"转成一个向量，加到词向量上，让模型能够区分顺序。研究对象：如何在不污染词义的前提下，把顺序信息注入模型。'],
+      ['Level 2 · 核心机制','自注意力对输入做任意置换，输出都不变（置换不变性）——所以模型"天生瞎"于顺序。位置编码通过叠加一个只与位置有关的向量，打破这种对称，让模型重新"看见"次序。'],
+      ['Level 3 · 学术解释','Vaswani et al. 2017 提出正弦位置编码 PE(pos,2i) = sin(pos/10000^(2i/d))；可学习位置编码让模型自己从数据里学；RoPE 用旋转矩阵把相对位置编码进注意力点积，天然支持相对位置关系与更好的长度外推。'],
+    ],
+    apply: '真实案例：GPT 系列使用可学习绝对位置编码并受训练窗口限制；Llama 使用 RoPE；长文档阅读、Agent 多轮记忆、长视频理解，全都依赖位置编码的外推能力——这也正是各家模型比拼"上下文窗口"的底层原因。',
+    detectQ: '解释题：用自己的话说，为什么"绝对位置编码"很难同时让模型理解"第 5 个词与第 6 个词相邻"和"第 5 个词与第 50 个词相距很远"这两件事？',
+    solutions: {
+      past: '过去怎么解决：RNN 按顺序逐步读入、CNN 用卷积核感受局部窗口——顺序感是结构自带的。缺点：RNN 难并行、长程记忆衰减。',
+      now: '现在怎么解决：RoPE 旋转位置编码成为主流；另有相对位置编码、ALiBi 注意力偏置；配合 YaRN 等插值方法把上下文扩展到百万 token。为什么更好：既保留相对距离信息，又支持并行训练。',
+      degree: '解决到什么程度：百万级 token 上下文已实现；但长程依赖建模与"训练长度≠推理长度"的外推问题仍未根治。',
+      bottleneck: '为什么还没完全解决：位置泛化的理论理解不足；超长上下文让注意力计算成本线性增长；训练数据里的长序列天然稀少。',
+    },
+    cardExtra: {
+      whyHard: '因为顺序是"关系"而不是"属性"：模型要的不是第几个，而是"谁和谁相邻、谁影响谁"，这比给每个词发号牌难得多。',
+      myUnd: '我的理解：位置编码解决的是"注意力看不见顺序"的盲点，RoPE 则把"顺序"藏进了向量旋转的角度里。',
+      related: '[[自注意力]]\n[[RoPE]]\n[[长度外推]]\n[[词嵌入]]',
+    },
+  },
+  'turbulence': {
+    problem: '湍流为什么是物理学最难的未解问题之一？',
+    domain: '物理学 → 流体力学 → 非线性动力学 → 湍流',
+    viewQ: '它实际上是在问：流体运动的方程早就写出来了，为什么一团烟的轨迹却至今无法精确预测？',
+    panorama: [
+      ['属于哪个领域','物理学 → 流体力学 → 非线性动力学 → 湍流。'],
+      ['领域在研究什么','研究流体在高速或受扰下，从有序流动转变为杂乱无章的多尺度运动，并试图预测它。'],
+      ['你的问题在问什么','烟升起时先直后乱：方程（纳维-斯托克斯方程）明明写在纸上，为什么这团"乱"就是算不准？你在问"确定性方程为什么给出不可预测的答案"。'],
+      ['为什么重要','飞机机翼、天气、血液流动、管道输油、火箭发动机全被湍流支配；NASA 称之为"经典物理最后的未解难题"，它还连着 100 万美元的千禧年大奖问题。'],
+      ['大致解决路线','问题 → 原因A（方程非线性）→ 原因B（多尺度）→ 原因C（对初值极端敏感）→ 传统方法（实验关联式、雷诺平均 RANS）→ 改进方法（大涡模拟 LES）→ 现代方法（直接数值模拟 DNS、机器学习）→ 当前瓶颈（计算量、闭合模型）。'],
+    ],
+    tree: [
+      { label: '湍流', level: 0 },
+      { label: '纳维-斯托克斯方程', level: 1 },
+      { label: '非线性项', level: 2 },
+      { label: '雷诺数', level: 1 },
+      { label: '惯性力 vs 粘性力', level: 2 },
+      { label: '能量级串', level: 1 },
+      { label: 'K41 标度律', level: 2 },
+      { label: '耗散', level: 2 },
+      { label: '工程模拟', level: 1 },
+      { label: 'RANS / LES / DNS', level: 2 },
+    ],
+    levels: [
+      ['Level 0 · 生活语言','搅动一杯水：水纹先规律、后混乱。湍流就是"规律如何死亡"的过程——从整齐的旋涡，碎成一片无法一眼看穿的混沌。'],
+      ['Level 1 · 百科级解释','定义：湍流是流体中随机、多尺度、强耗散的流动状态。研究对象：看似无序之中的统计规律——比如柯尔莫哥洛夫发现的能量谱标度律。'],
+      ['Level 2 · 核心机制','雷诺数升高后，惯性力压过粘性力，微小扰动被非线性放大；能量从大涡逐级传给小涡（能量级串），直到最小尺度被粘性耗散成热。尺度跨越几个数量级，这就是"算不动"的根源。'],
+      ['Level 3 · 学术解释','纳维-斯托克斯方程是确定性的，但系统对初值极端敏感（混沌）；K41 理论给出能谱 E(k) ∝ k^(-5/3) 的标度律；雷诺平均引入未知的雷诺应力，导致"闭合问题"；方程是否存在全局光滑解是千禧年七大难题之一。'],
+    ],
+    apply: '真实案例：飞机设计用 RANS 估算升力阻力；天气预报用 LES 模拟云与对流；芯片散热、人工心脏瓣膜的血流都依赖湍流模拟；近年机器学习开始做小尺度湍流建模与数据驱动闭合，把 DNS 的计算量压缩几个数量级。',
+    detectQ: '因果题：如果流体粘性 ν 增大，湍流为什么会减弱？请用雷诺数 Re = UL/ν 来解释。',
+    solutions: {
+      past: '过去怎么解决：风洞实验 + 经验关联式（摩擦系数、传热系数），工程师"靠查表"。为什么有效：特定工况下数据可靠。缺点：换一个几何或工况就要重新做实验。',
+      now: '现在怎么解决：RANS 作为工程标准、LES 大涡模拟解析大尺度、DNS 在小雷诺数下精确求解、机器学习代理模型加速。为什么更好：从"经验"走向"部分第一性原理"。',
+      degree: '解决到什么程度：工程上"够用"的预测已经实现；但从第一性原理精确预测高雷诺数复杂几何，仍然不可行。',
+      bottleneck: '为什么还没完全解决：计算量随雷诺数约 Re³ 增长；闭合模型不普适；纳维-斯托克斯方程的全局光滑解尚未证明（千禧年问题）。',
+    },
+    cardExtra: {
+      whyHard: '因为一个确定性方程会因初值的微小差异走向完全不同的细节，而细节的尺度又跨越十多个数量级——任何计算机都装不下"全部分寸"。',
+      myUnd: '我的理解：湍流难在"确定性 ≠ 可预测"，它逼我们把目标从"算准每个涡"改成"算准统计规律"。',
+      related: '[[纳维-斯托克斯方程]]\n[[雷诺数]]\n[[K41 理论]]\n[[大涡模拟]]',
+    },
+  },
+};
+/* 演示模式通用内容 */
+const DEMO_GENERIC = {
+  noProblem: (q) => '我还没有收到明确的领域难题。演示模式内置了 4 个示例难题（大模型幻觉、光学像差、位置编码、湍流），选择其中一个可以完整体验完整学习流程。\n\n如果你的难题不在其中，请先告诉我：**它属于哪个领域？**（例如"它属于光学/人工智能/物理/生物…"）——自上而下学习的第一步，就是先定位问题的"山顶"在哪座山上。\n\n也可以点击右上角"设置"，接入任意 OpenAI 兼容 API，让我真正为你讲解任意难题。',
+};
+/* ========== 渲染：旅程 / 侧栏 / 状态区 ========== */
+function updateStageUI(){
+  $$('.jstep').forEach(el=>{
+    const n = +el.dataset.s;
+    el.classList.toggle('on', n === S.stage);
+    el.classList.toggle('done', S.doneStages.includes(n));
+  });
+  $$('.rail-item').forEach(el=>{
+    const n = +el.dataset.s;
+    el.classList.toggle('on', n === S.stage);
+    el.classList.toggle('done', S.doneStages.includes(n));
+  });
+  $('#stageCount').textContent = S.doneStages.length + ' / 6';
+}
+function updateZones(){
+  const set = (id, arr, colorVar)=>{
+    const box = $(id);
+    box.innerHTML = '';
+    if(!arr.length){ box.innerHTML = '<span class="ztag empty-hint" style="color:var(--ink-low)">暂无</span>'; return; }
+    arr.forEach(c=>{
+      const t = document.createElement('span');
+      t.className = 'ztag clickable'; t.textContent = c;
+      t.style.color = colorVar; t.title = '再次讲解：' + c;
+      t.addEventListener('click', ()=>{ $('#input').value = '讲讲 ' + c; send(); });
+      box.appendChild(t);
+    });
+  };
+  set('#zoneOk', S.zones.ok, '#9FE0C2');
+  set('#zoneHalf', S.zones.half, '#F0DCA0');
+  set('#zoneNone', S.zones.none, '#F2ACB2');
+}
+function updateSideProblem(){
+  const el = $('#curProblem');
+  el.textContent = S.problem || '尚未开始学习。选择一个领域难题，或直接在下方输入。';
+}
+function treeToText(nodes){
+  const lines = []; const stack = [];
+  nodes.forEach((n,i)=>{
+    const d = n.level;
+    while(stack.length > d) stack.pop();
+    const isLast = !(i+1 < nodes.length && nodes[i+1].level > d);
+    let line = '';
+    for(let k=1;k<d;k++) line += (stack[k] ? '    ' : '│   ');
+    if(d>0) line += (isLast ? '└── ' : '├── ');
+    line += n.label;
+    lines.push(line);
+    stack[d] = isLast;
+  });
+  return lines.join('\n');
+}
+function renderTree(){
+  const box = $('#treeBody');
+  if(!S.tree.length){
+    box.innerHTML = '<p style="font-size:13px;color:var(--ink-low);line-height:1.7">开始学习后，这里会显示围绕原问题建立的知识层级树。点击概念节点可以直接下钻讲解。</p>';
+    return;
+  }
+  box.innerHTML = '';
+  const stack = [box];
+  S.tree.forEach((n,i)=>{
+    while(stack.length > n.level + 1) stack.pop();
+    let cont = stack[n.level];
+    if(!cont){
+      cont = document.createElement('div');
+      cont.className = 'tree-branch';
+      stack[n.level-1].appendChild(cont);
+      stack[n.level] = cont;
+    }
+    const d = document.createElement('div');
+    d.className = 'tree-node ' + (n.level===0?'root':(n.level===1?'l1':'l2'));
+    d.innerHTML = '<span class="tn-dot"></span><span>' + esc(n.label) + '</span>';
+    if(n.level > 0){
+      d.addEventListener('click', ()=>{ $('#input').value = '讲讲 ' + n.label; send(); });
+      d.title = '下钻讲解：' + n.label;
+    }
+    cont.appendChild(d);
+  });
+}
+/* ========== 消息渲染 ========== */
+function scrollBottom(){ const c = $('#chatScroll'); c.scrollTop = c.scrollHeight; }
+function addMsg(role, text, opts){
+  opts = opts || {};
+  const wrap = $('#chatInner');
+  const m = document.createElement('div');
+  m.className = 'msg ' + role;
+  const ava = role==='user'
+    ? '<div class="ava"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>'
+    : '<div class="ava"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></div>';
+  const badge = opts.stage ? '<div class="stage-badge">' + esc(STAGE_NAMES[opts.stage] || '') + '</div>' : '';
+  const qtag = opts.question ? '<div class="qtag">' + esc(opts.question) + '</div>' : '';
+  m.innerHTML = ava + '<div class="msg-body"><div class="bubble"><div class="md">' + badge + mdToHtml(text) + qtag + '</div></div></div>';
+  wrap.appendChild(m);
+  scrollBottom();
+  S.history.push({ role, text, stage: opts.stage || 0, question: opts.question || '' });
+  return m;
+}
+function withTyping(cb){
+  const wrap = $('#chatInner');
+  const t = document.createElement('div');
+  t.className = 'msg';
+  t.innerHTML = '<div class="ava"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></div><div class="msg-body"><div class="bubble"><div class="typing"><i></i><i></i><i></i></div></div></div>';
+  wrap.appendChild(t); scrollBottom();
+  return new Promise(res => setTimeout(()=>{ t.remove(); scrollBottom(); res(); }, cb||520));
+}
+function addQuickTag(role, text, stage){
+  if(role!=='assistant') return;
+  const all = Array.from(document.querySelectorAll('#chatInner .msg.assistant'));
+  const last = all[all.length-1];
+  if(!last) return;
+  const body = last.querySelector('.msg-body');
+  const row = document.createElement('div');
+  row.className = 'input-hint';
+  row.style.marginTop = '8px';
+  row.style.flexWrap = 'wrap';
+  row.innerHTML = '<span style="color:var(--ink-low)">标记理解程度：</span>';
+  [['已理解','ok','#4CC38A'],['基本理解','half','#E6C15C'],['尚未理解','none','#E5606B']].forEach(([label,key,color])=>{
+    const b = document.createElement('button');
+    b.className = 'cmd';
+    b.textContent = label;
+    b.style.color = color; b.style.borderColor = color;
+    b.addEventListener('click', ()=>{
+      const concept = S.tree.filter(n=>n.level>0).map(n=>n.label).pop() || S.problem.slice(0,12);
+      S.zones.ok = S.zones.ok.filter(x=>x!==concept);
+      S.zones.half = S.zones.half.filter(x=>x!==concept);
+      S.zones.none = S.zones.none.filter(x=>x!==concept);
+      S.zones[key].push(concept);
+      updateZones(); toast('已标记为「' + label + '」');
+    });
+    row.appendChild(b);
+  });
+  body.appendChild(row);
+}
+/* ========== 演示模式引擎 ========== */
+function matchSample(t){
+  const map = [
+    ['llm-hallucination',['幻觉','大模型','hallucinat','为什么会产生']],
+    ['aberration',['像差','镜头','光学','模糊变形','透镜']],
+    ['pos-encoding',['位置编码','transformer','pos','编码']],
+    ['turbulence',['湍流','紊流','流体']],
+  ];
+  const low = t.toLowerCase();
+  for(const [k,words] of map){ if(words.some(w=>low.includes(w))) return k; }
+  return '';
+}
+function demoReply(msgs){
+  const next = msgs.shift();
+  if(!next){ S.busy = false; return Promise.resolve(); }
+  S.busy = true;
+  return withTyping().then(()=>{
+    addMsg('assistant', next.text, { stage: next.stage, question: next.question || '' });
+    addQuickTag('assistant', next.text, next.stage);
+    return demoReply(msgs);
+  });
+}
+function pack(){ return DEMO[S.sampleKey]; }
+function startSample(key){
+  S.busy = true;
+  S.sampleKey = key;
+  S.problem = DEMO[key].problem;
+  S.tree = DEMO[key].tree.slice();
+  S.levels = 0;
+  updateSideProblem(); renderTree();
+  S.doneStages = [];
+  S.stage = 1;
+  const p = pack();
+  const intro = addMsg('assistant', p.panorama.map((x,i)=>'**'+(i+1)+'. ' + x[0] + '**：' + x[1]).join('\n\n') + '\n\n> ' + p.viewQ, { stage:1 });
+  S.doneStages.push(1); S.stage = 2; updateStageUI();
+  withTyping().then(()=>{
+    addMsg('assistant', '围绕这个难题，我们只需要这些知识——**理解它所需的最小知识树**：\n\n```\n' + treeToText(p.tree) + '\n```\n\n这就是"只有解决当前问题必须知道的知识"。\n\n告诉我你想先钻哪一个概念（或发送 **@下钻**，我从第一个讲起）。', { stage:2 });
+    S.doneStages.push(2); S.stage = 3; updateStageUI();
+    S.busy = false;
+  });
+  $('#intro').style.display = 'none';
+}
+function demoCommand(cmd, extra){
+  if(!S.problem){ toast('请先选择一个领域难题'); return; }
+  const p = pack();
+  const c = cmd.replace('@','');
+  if(c==='全景'){
+    demoReply([{ text: p.panorama.map((x,i)=>'**'+(i+1)+'. ' + x[0] + '**：' + x[1]).join('\n\n') + '\n\n> ' + p.viewQ, stage:1 }]);
+    S.stage = 1; S.doneStages.push(1); updateStageUI();
+  } else if(c==='下钻' || c==='知识树'){
+    if(S.levels >= p.levels.length){
+      demoReply([{ text: '我们已把这条链讲到了 Level ' + (p.levels.length) + '（研究前沿）。接下来该拆解**现有解决方案**了，发送 **@现状** 继续。', stage:5 }]);
+      S.stage = 5; return;
+    }
+    const lv = p.levels[S.levels];
+    S.levels++;
+    const pre = extra ? '好，我们下钻到 **' + extra + '**。\n\n' : '';
+    demoReply([{ text: pre + '**' + lv[0] + '**\n\n' + lv[1] + '\n\n' + p.detectQ, stage:3, question: p.detectQ }]);
+    S.stage = 3; S.doneStages.push(3); S.doneStages.push(4); updateStageUI();
+  } else if(c==='退回'){
+    S.levels = Math.max(0, (S.levels||1) - 1);
+    const lv = p.levels[S.levels];
+    demoReply([{ text: '好，我们退回一层，换一种更简单的说法。\n\n**' + lv[0] + '**\n\n' + lv[1], stage:3 }]);
+    S.stage = 3; updateStageUI();
+  } else if(c==='测试'){
+    demoReply([{ text: p.detectQ, stage:4, question: p.detectQ }]);
+    S.stage = 4; S.doneStages.push(4); updateStageUI();
+  } else if(c==='应用'){
+    demoReply([{ text: p.apply, stage:3 }]);
+    S.stage = 3; updateStageUI();
+  } else if(c==='回到问题'){
+    demoReply([{ text: '让我们回到最初的那个难题。\n\n> ' + p.viewQ + '\n\n**现在，你能不能用你自己的话，重新解释一遍这个难题？**' + (p.detectQ ? '\n\n（这正是我们的理解检测：解释、预测、应用，而不是"明白了吗"。）' : ''), stage:4, question:'用你自己的话重新解释这个难题' }]);
+    S.stage = 4; updateStageUI();
+  } else if(c==='现状'){
+    demoReply([
+      { text: '**' + p.solutions.past + '\n\n' + p.solutions.now + '\n\n' + p.solutions.degree + '\n\n' + p.solutions.bottleneck, stage:5 }
+    ]);
+    S.stage = 5; S.doneStages.push(5); updateStageUI();
+  } else if(c==='知识卡片' || c==='卡片'){
+    S.stage = 6; S.doneStages.push(6); updateStageUI();
+    buildCard();
+    S.busy = false;
+  }
+}
+function judgeAnswer(t){
+  const p = pack();
+  const neg = /不知道|不懂|没懂|没听懂|不明白|不会|没理解|理解不了|看不懂|太复杂|没学过/.test(t);
+  const lenient = /大概|差不多|可能|好像|有点|勉强|依稀/.test(t);
+  const concept = S.tree.filter(n=>n.level>0).map(n=>n.label).pop() || '当前概念';
+  if(neg){
+    S.zones.none = S.zones.none.concat([concept]);
+    updateZones();
+    if(S.levels > 0){
+      S.levels--;
+      const lv = p.levels[S.levels];
+      demoReply([{ text: '理解检测没通过——这不是你的问题，是**前置概念还没建立**。我们回退一级，换个角度。\n\n**' + lv[0] + '**\n\n' + lv[1] + '\n\n' + p.detectQ, stage:3, question: p.detectQ }]);
+    } else {
+      demoReply([{ text: '理解检测没通过。我们换个最生活化的角度再讲一次：\n\n' + p.levels[0][1] + '\n\n' + p.detectQ, stage:3, question: p.detectQ }]);
+    }
+    return;
+  }
+  if(lenient || t.length < 22){
+    S.zones.half = S.zones.half.concat([concept]);
+    updateZones();
+    demoReply([{ text: '你的理解方向是对的，但还不够牢靠。给你一个**类比/案例**巩固一下：\n\n' + (p.apply || p.levels[Math.min(S.levels, p.levels.length-1)][1]) + '\n\n现在再回答一次：' + p.detectQ, stage:4, question: p.detectQ }]);
+    S.stage = 4; updateStageUI();
+  } else {
+    S.zones.ok = S.zones.ok.concat([concept]);
+    updateZones();
+    if(S.levels < p.levels.length){
+      const lv = p.levels[S.levels];
+      S.levels++;
+      demoReply([{ text: '掌握得不错，已记入"已理解区"。继续下钻：\n\n**' + lv[0] + '**\n\n' + lv[1] + '\n\n' + p.detectQ, stage:3, question: p.detectQ }]);
+      S.stage = 3; S.doneStages.push(4); updateStageUI();
+    } else {
+      demoReply([{ text: '很好，这条链我们已经走到底了。现在进入系统的最终核心——**拆解现有解决方案**：\n\n' + p.solutions.past + '\n\n' + p.solutions.now + '\n\n' + p.solutions.degree + '\n\n' + p.solutions.bottleneck + '\n\n发送 **@知识卡片** 生成你的领域知识卡。', stage:5 }]);
+      S.stage = 5; S.doneStages.push(5); updateStageUI();
+    }
+  }
+}
+function runDemo(text){
+  const t = text.trim();
+  addMsg('user', t);
+  S.busy = true;
+  if(t.startsWith('@')){
+    let m = t.match(/^@(\S+)\s*(.*)$/);
+    demoCommand(m[1], m[2] || '');
+    return;
+  }
+  const explain = t.match(/^讲讲\s+(.+)$/);
+  if(explain){
+    const name = explain[1].trim();
+    const node = S.tree.find(n=>n.label === name);
+    if(node){
+      const p = pack();
+      const lv = p.levels[Math.min(S.levels, p.levels.length-1)];
+      demoReply([{ text: '**' + lv[0] + ' · ' + name + '**\n\n' + lv[1] + '\n\n' + p.detectQ, stage:3, question: p.detectQ }]);
+      S.stage = 3; updateStageUI();
+    } else {
+      demoReply([{ text: '这个概念不在当前知识树里。我们可以只讲它一句：' + name + ' 是理解 ' + S.problem + ' 时会用到的一个概念。先把主线走完，再回来补它。', stage:3 }]);
+    }
+    return;
+  }
+  if(!S.problem){
+    const key = matchSample(t);
+    if(key){ startSample(key); return; }
+    demoReply([{ text: DEMO_GENERIC.noProblem(t), stage:0 }]);
+    return;
+  }
+  judgeAnswer(t);
+}
+/* ========== API 模式 ========== */
+const SYSTEM_PROMPT = [
+  '你是"自上而下领域学习系统"（Top-Down Domain Learning OS）的苏格拉底式导师。你的任务是从用户提出的领域难题出发，反向构建理解该问题所需的最小知识体系，绝不一次性倾倒百科知识。',
+  '执行规则：',
+  '1. 先建立领域全景：①这个问题属于哪个领域（如 光学→光学设计→成像→像差）②该领域在研究什么（百科级语言，不堆术语）③用户的问题到底在问什么（翻译成人话）④为什么重要（谁关心/不解决会怎样）⑤大致解决路线（地图式：问题→原因→传统→改进→现代→瓶颈）。',
+  '2. 建立"理解此问题所需的最小知识树"，只保留真正影响理解的概念，不要无限扩展。',
+  '3. 自上而下逐层讲解：Level0 生活语言→Level1 百科级→Level2 核心机制→Level3 学术→Level4 应用→Level5 前沿；一次只下钻一层。',
+  '4. 每讲完一个重要概念，必须提出一个理解检测问题（解释题/因果题/判断题/反例题），让用户用自己的话回答；禁止只问"明白了吗"。',
+  '5. 根据用户回答动态下钻：掌握→继续；大致理解→补案例/类比再问；概念混乱→回退一级换解释；基础缺失→先补前置知识。',
+  '6. 避免术语套娃：新术语必要才解释一句。',
+  '7. 持续维护"✅已理解 / 🟡基本理解 / 🔴尚未理解"清单并据此决定下一步。',
+  '8. 关键知识建立后回到原始难题，让用户重新解释。',
+  '9. 最终拆解现有解法：过去怎么解决（为何有效/缺点）→现在怎么解决（技术路线/为何更好）→解决到什么程度（哪些解决/哪些缓解）→为什么还没完全解决（真正瓶颈）。',
+  '10. 生成知识卡片用纯 Markdown，公式用纯文本（如 ∇·E = ρ/ε₀），不依赖 LaTeX。',
+  '支持用户指令：@全景 @下钻 @退回 @测试 @应用 @回到问题 @现状 @知识卡片。',
+  '最重要的执行规则：不要一次讲完整个领域；知识深度由用户回答决定；"看不懂"时要判断是哪个前置概念缺失；最终一定回到"这个难题现在到底怎么解决"。'
+].join('\n');
+async function runApi(text){
+  const t = text.trim();
+  addMsg('user', t);
+  S.busy = true;
+  const a = S.api;
+  if(!a.key){ addMsg('assistant','还没有配置 API Key。请点击右上角"设置"，选择"接入 API"，填入接口地址、Key 和模型名后保存。', { stage:0 }); S.busy = false; return; }
+  const msgs = [{ role:'system', content: SYSTEM_PROMPT }];
+  if(!S.problem) msgs.push({ role:'user', content:'用户提交的领域难题是：「' + t + '」。请先建立领域全景（5 点），并在最后提出一个理解检测问题。' });
+  else msgs.push({ role:'user', content:'当前领域难题是：「' + S.problem + '」。' });
+  S.history.slice(-16).forEach(h=>msgs.push({ role:h.role, content:h.text }));
+  const bubble = await withTyping().then(()=>addMsg('assistant','', { stage: S.stage||1 }));
+  const mdEl = bubble.querySelector('.md');
+  let acc = '';
+  try{
+    const res = await fetch(a.base.replace(/\/+$/,'') + '/chat/completions', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer ' + a.key },
+      body: JSON.stringify({ model:a.model, messages:msgs, stream:true, temperature:0.7 }),
+    });
+    if(!res.ok){
+      let err = '请求失败（HTTP ' + res.status + '）';
+      try{ const j = await res.json(); err = j.error?.message || err; }catch(e){}
+      throw new Error(err);
+    }
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '';
+    while(true){
+      const { done, value } = await reader.read();
+      if(done) break;
+      buf += dec.decode(value, { stream:true });
+      const parts = buf.split('\n');
+      buf = parts.pop();
+      for(const p of parts){
+        const line = p.trim();
+        if(!line.startsWith('data:')) continue;
+        const d = line.slice(5).trim();
+        if(d === '[DONE]') continue;
+        try{
+          const j = JSON.parse(d);
+          const delta = j.choices?.[0]?.delta?.content || '';
+          if(delta){ acc += delta; mdEl.innerHTML = mdToHtml(acc); scrollBottom(); }
+        }catch(e){}
+      }
+    }
+    if(!acc) acc = '（模型未返回内容，请检查模型名称与接口地址。）';
+    mdEl.innerHTML = mdToHtml(acc);
+    S.history[S.history.length-1].text = acc;
+    if(!S.problem && t.indexOf('@') !== 0){
+      S.problem = t.slice(0, 40) + (t.length>40?'…':'');
+      S.tree = [];
+      updateSideProblem();
+    }
+    addQuickTag('assistant', acc, S.stage||1);
+    if(/^@知识卡片/.test(t)) buildCard();
+    scrollBottom();
+  }catch(err){
+    mdEl.innerHTML = '<p style="color:var(--red)">' + esc('请求失败：' + err.message) + '</p><p style="color:var(--ink-mid);font-size:13px">请检查设置中的接口地址、Key 与模型名，或切换回演示模式。</p>';
+    toast('API 请求失败');
+  }
+  S.busy = false;
+}
+/* ========== 知识卡片 ========== */
+function buildCard(){
+  const p = pack();
+  let md;
+  if(p){
+    const treeTxt = treeToText(p.tree);
+    const concepts = p.tree.filter(n=>n.level>0).map(n=>n.label).join('、');
+    md = [
+      '# ' + S.problem,
+      '',
+      '## 1. 这个问题到底在研究什么',
+      p.panorama[1][1],
+      '',
+      '## 2. 为什么重要',
+      p.panorama[3][1],
+      '',
+      '## 3. 为什么难',
+      p.cardExtra.whyHard,
+      '',
+      '## 4. 核心知识体系',
+      '```',
+      treeTxt,
+      '```',
+      '',
+      '## 5. 关键概念',
+      concepts,
+      '',
+      '## 6. 传统解决方案',
+      p.solutions.past,
+      '',
+      '## 7. 当前主流解决方案',
+      p.solutions.now,
+      '',
+      '## 8. 当前瓶颈',
+      p.solutions.bottleneck,
+      '',
+      '## 9. 我的理解',
+      p.cardExtra.myUnd,
+      '',
+      '## 10. 相关问题',
+      p.cardExtra.related,
+      '',
+    ].join('\n');
+  } else {
+    const byStage = {};
+    S.history.filter(h=>h.role==='assistant').forEach(h=>{ if(h.stage && !byStage[h.stage]) byStage[h.stage] = h.text; });
+    const cut = s => s && s.length>500 ? s.slice(0,500)+'…' : s;
+    md = [
+      '# ' + (S.problem || '领域难题'),
+      '',
+      '## 1. 这个问题到底在研究什么',
+      cut(byStage[1] || '（待补充：回顾学习记录后填写）'),
+      '',
+      '## 2. 为什么重要',
+      '（待补充）',
+      '',
+      '## 3. 为什么难',
+      '（待补充）',
+      '',
+      '## 4. 核心知识体系',
+      cut(byStage[2] || byStage[3] || '（待补充）'),
+      '',
+      '## 5. 关键概念',
+      S.tree.filter(n=>n.level>0).map(n=>n.label).join('、') || '（待补充）',
+      '',
+      '## 6. 传统解决方案',
+      cut(byStage[5] || '（待补充）'),
+      '',
+      '## 7. 当前主流解决方案',
+      cut(byStage[5] || '（待补充）'),
+      '',
+      '## 8. 当前瓶颈',
+      cut(byStage[5] || '（待补充）'),
+      '',
+      '## 9. 我的理解',
+      '（用四问自检后填写：它研究什么？为什么难？需要哪些核心知识？现在主流怎么解决？）',
+      '',
+      '## 10. 相关问题',
+      '[[相关概念1]]\n[[相关概念2]]',
+      '',
+    ].join('\n');
+  }
+  S.card = md;
+  $('#cardMd').innerHTML = mdToHtml(md);
+  $('#cardOverlay').classList.add('open');
+}
+/* ========== 设置 ========== */
+function loadSettings(){
+  try{
+    const j = JSON.parse(localStorage.getItem('tdl-settings') || 'null');
+    if(j){ S.api = Object.assign(S.api, j.api||{}); S.mode = j.mode || 'demo'; }
+  }catch(e){}
+  $('#apiBase').value = S.api.base;
+  $('#apiKey').value = S.api.key;
+  $('#apiModel').value = S.api.model;
+  syncModeUI();
+}
+function saveSettings(){
+  S.api.base = $('#apiBase').value.trim() || 'https://api.deepseek.com/v1';
+  S.api.key = $('#apiKey').value.trim();
+  S.api.model = $('#apiModel').value.trim() || 'deepseek-chat';
+  localStorage.setItem('tdl-settings', JSON.stringify({ api:S.api, mode:S.mode }));
+  $('#settingsOverlay').classList.remove('open');
+  syncModeUI();
+  toast('设置已保存');
+}
+function syncModeUI(){
+  const api = S.mode === 'api';
+  const pill = $('#modePill');
+  pill.classList.toggle('api', api);
+  pill.classList.toggle('demo', !api);
+  $('#modePillText').textContent = api ? 'API 模式' : '演示模式';
+  $('#modeDemoBtn').classList.toggle('primary', !api);
+  $('#modeApiBtn').classList.toggle('primary', api);
+  $('#apiFields').style.opacity = api ? 1 : .45;
+  $('#apiFields').style.pointerEvents = api ? 'auto' : 'none';
+  $('#inputHint').innerHTML = api
+    ? '<span>API 模式：' + esc(S.api.model) + ' · ' + esc(S.api.base.replace(/^https?:\/\//,'')) + '</span>'
+    : '<span>演示模式：内置示例讲师，无需 API 即可体验；点击右上角"设置"可接入任意 OpenAI 兼容接口</span>';
+}
+/* ========== 事件 ========== */
+function send(){
+  const ta = $('#input');
+  const t = ta.value.trim();
+  if(!t || S.busy) return;
+  ta.value = ''; ta.style.height = 'auto';
+  if(S.mode === 'demo') runDemo(t);
+  else runApi(t);
+}
+function bindEvents(){
+  $('#sendBtn').addEventListener('click', send);
+  const ta = $('#input');
+  ta.addEventListener('keydown', e=>{
+    if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); send(); }
+  });
+  ta.addEventListener('input', ()=>{ ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 160) + 'px'; });
+  $$('.cmd').forEach(b=>b.addEventListener('click', ()=>{
+    if(!S.problem && b.dataset.cmd !== '@全景'){ toast('请先选择一个领域难题'); return; }
+    $('#input').value = b.dataset.cmd; send();
+  }));
+  $$('.sample').forEach(b=>b.addEventListener('click', ()=>{
+    const key = matchSample(b.dataset.q);
+    if(key) startSample(key);
+  }));
+  $$('.rail-item').forEach(el=>el.addEventListener('click', ()=>{
+    const n = +el.dataset.s;
+    const cmds = { 1:'@全景', 2:'@下钻', 3:'@下钻', 4:'@测试', 5:'@现状', 6:'@知识卡片' };
+    if(!S.problem){ toast('请先选择一个领域难题'); return; }
+    $('#input').value = cmds[n]; send();
+  }));
+  $('#treeBtn').addEventListener('click', ()=>{ renderTree(); $('#treeDrawer').classList.add('open'); });
+  $('#treeClose').addEventListener('click', ()=>$('#treeDrawer').classList.remove('open'));
+  $('#settingsBtn').addEventListener('click', ()=>$('#settingsOverlay').classList.add('open'));
+  $('#settingsClose').addEventListener('click', ()=>$('#settingsOverlay').classList.remove('open'));
+  $('#cardClose').addEventListener('click', ()=>$('#cardOverlay').classList.remove('open'));
+  $$('.overlay').forEach(o=>o.addEventListener('click', e=>{ if(e.target === o) o.classList.remove('open'); }));
+  $('#modePill').addEventListener('click', ()=>$('#settingsOverlay').classList.add('open'));
+  $('#modeDemoBtn').addEventListener('click', ()=>{ S.mode='demo'; syncModeUI(); });
+  $('#modeApiBtn').addEventListener('click', ()=>{ S.mode='api'; syncModeUI(); });
+  $('#saveSettings').addEventListener('click', saveSettings);
+  $('#cardCopy').addEventListener('click', async ()=>{
+    try{ await navigator.clipboard.writeText(S.card); toast('Markdown 已复制'); }
+    catch(e){ toast('复制失败，请手动选择复制'); }
+  });
+  $('#cardDownload').addEventListener('click', ()=>{
+    const blob = new Blob([S.card], { type:'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = '领域知识卡片.md';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 2000);
+    toast('已下载 .md 文件');
+  });
+  $('#sideToggle').addEventListener('click', ()=>$('#side').classList.toggle('open'));
+}
+/* ========== 初始化 ========== */
+loadSettings();
+bindEvents();
+updateStageUI();
+updateZones();
+(function(){
+  const m = location.search.match(/[?&]auto=([^&]+)/);
+  if(m && DEMO[m[1]]){ setTimeout(()=>startSample(m[1]), 300); }
+})();
+
+</script>
+</body>
+</html>
